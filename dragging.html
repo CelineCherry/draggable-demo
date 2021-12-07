@@ -155,7 +155,13 @@ class MenuElement {
 			this.y = data[2];
 			this.r = data[3];
 		} //x, y, radius
-		else if (data[0] == "image"){} //x, y, width, height
+		else if (data[0] == "image"){
+			this.imageData = data[1];
+			this.x = data[2];
+			this.y = data[3];
+			this.w = data[4];
+			this.h = data[5];
+		} //x, y, width, height
 		else if (data[0] == "path"){} //pathdata(?), x, y
 
 		//this.x = x;
@@ -200,7 +206,9 @@ class MenuElement {
 				ctx.stroke();
 			}
 		}
-		if(this.type == "image"){} //drawImage
+		if(this.type == "image"){
+			ctx.drawImage(this.imageData, this.x, this.y, this.w, this.h);
+		} //drawImage
 		if(this.type == "path"){} //transform and reset
 	}
 	checkClick(mx, my){
@@ -227,7 +235,7 @@ class MenuElement {
 
 //var draggable = new Button(0,0,100,25, "brown", 7, "drag me", "white", "10px sans-serif");
 
-var draggable = new MenuElement(["circle", 0,0,100,25], "brown", [7, "black"], ["drag me", "white", "10px sans-serif"]);
+var draggable = new MenuElement(["rectangle", 0,0,100,25], "brown", [7, "black"], ["drag me", "white", "10px sans-serif"]);
 
 draggable.render();
 
