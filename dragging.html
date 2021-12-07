@@ -1,0 +1,240 @@
+<title>Dragging Demo</title>
+<style>
+canvas {
+	border: 5px solid black;
+}
+</style>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+/*
+example elements:
+square
+circle
+crate (image)
+frame count (backless image)
+face (path with cutout)
+*/
+
+var canvas = document.getElementById("gameCanvas");
+canvas.height = 500;
+canvas.width = 750;
+var ctx = canvas.getContext("2d");
+
+ctx.miterLimit = 2;
+
+function ease(variable, upwards, increment, lowerBound, upperBound){
+	var number = variable;
+	if(upwards){
+		number += increment;
+		if (number > upperBound){number = upperBound}
+	}
+	else{
+		number -= increment;
+		if (number < lowerBound){number = lowerBound}
+	}
+	return number;
+}
+
+function fillAndStrokeText(text, x, y){
+	ctx.strokeText(text, x, y);
+	ctx.fillText(text, x, y);
+}
+
+function drawBox(x, y, w, h, color, borderWidth = false, borderColor = "black", text = false, textColor = "white", font = "bold 10px sans-serif"){
+	var fontSize = parseInt(ctx.font.match(/\d+/), 10);
+	if(borderWidth){
+		ctx.strokeStyle = borderColor;
+		ctx.lineWidth = borderWidth;
+		ctx.strokeRect(x,y, w,h);
+	}
+	ctx.fillStyle = color;
+	ctx.fillRect(x,y, w,h);
+	if(text){
+		ctx.font = font;
+		ctx.fillStyle = textColor;
+		ctx.textAlign = "center";
+		ctx.textBaseline = "middle";		
+		ctx.fillText(text, x + w/2, y + h/2 + 1);		
+		ctx.textAlign = "left";
+	}		
+}
+
+function breakTextIntoLines(string, width){
+	var offset = 0;
+	var lines = [];
+	var i = 0;
+	for (i = 0; i < string.length; i++){
+		if (ctx.measureText(string.slice(offset, i)).width > width){
+			var lineEnd = string.slice(0, i).lastIndexOf(" ") + 1;
+			var line = string.slice(offset, lineEnd);
+			lines.push(line);
+			offset = lineEnd;
+		}
+	}
+	lines.push(string.slice(offset));
+	return lines;
+}
+
+function drawTextLines(x, y, lines, drawType = "fill"){
+	var fontHeight = parseInt(ctx.font.match(/\d+/), 10);
+	var i = 0;
+	if(drawType == "fill"){
+		for(i = 0; i < lines.length; i++){					
+			ctx.fillText(lines[i], x, y + i * 1.75 * fontHeight);
+		}
+	}
+	else if(drawType == "stroke"){
+		for(i = 0; i < lines.length; i++){					
+			ctx.strokeText(lines[i], x, y + i * 1.75 * fontHeight);
+		}
+	}
+	else if(drawType == "both"){
+		for(i = 0; i < lines.length; i++){
+			ctx.strokeText(lines[i], x, y + i * 1.75 * fontHeight);	
+			ctx.fillText(lines[i], x, y + i * 1.75 * fontHeight);
+		}
+	}
+}
+
+class Button {
+	constructor(x, y, w, h, color, border = false, text = false, textColor, font){
+		this.x = x;
+		this.y = y;
+		this.w = w;
+		this.h = h;
+		this.color = color;
+		if(border){this.border = border;}
+		if(text){
+			this.text = text;
+			this.textColor = textColor;
+			this.font = font;
+		}
+	}
+	render(){
+		if(this.text){drawBox(this.x, this.y, this.w, this.h, this.color, this.border, "black", this.text, this.textColor, this.font);}
+		else {drawBox(this.x, this.y, this.w, this.h, this.color, this.border, "black");}
+	}
+	checkClick(mx, my){
+		if(this.x < mx && mx < this.x + this.w && this.y < my && my < this.y + this.h){
+			return true;
+		}
+		else {
+			return false;
+		}
+	} 
+}
+//move paths with ctx.transform and apply transform.
+class Element {
+	constructor(data, /*x, y, w, h*/ color, border = false, text = false){
+		//data consists of a shape type and data. 
+		this.data = data;
+		this.type = data[0];
+		if(data[0] == "rectangle"){
+			this.x = data[1];
+			this.y = data[2];
+			this.w = data[3];
+			this.h = data[4];
+		}
+
+		//this.x = x;
+		//this.y = y;
+		//this.w = w;
+		//this.h = h;
+		if(color){this.color = color;}
+		if(border){
+			this.borderWidth = border[0];
+			this.borderColor = border[1];
+		}
+		else {
+			this.borderWidth = false;
+			this.borderColor = 0;
+		}
+
+		if(text){ //triple
+			this.text = text[0];
+			this.textColor = text[1];
+			this.font = text[2];
+		}
+		else {
+			this.text = false;
+			this.textColor = 0;
+			this.font = 0;
+		}
+	}
+	render(){ //check type and execute specific render. paths render with transform and reset transform
+		if(this.type == "rectangle"){
+			if(this.text){drawBox(this.x, this.y, this.w, this.h, this.color, this.borderWidth, this.borderColor, this.text, this.textColor, this.font);}
+			else {drawBox(this.x, this.y, this.w, this.h, this.color, this.borderWidth, this.borderColor);}
+		}
+	}
+	checkClick(mx, my){
+		//type based collison checking, for paths use subtract and point in path.
+		if(this.x < mx && mx < this.x + this.w && this.y < my && my < this.y + this.h){
+			return true;
+		}
+		else {
+			return false;
+		}
+	} 
+}
+
+//var draggable = new Button(0,0,100,25, "brown", 7, "drag me", "white", "10px sans-serif");
+
+var draggable = new Element(["rectangle", 0,0,100,25], "brown", [7, "black"], ["drag me", "white", "10px sans-serif"]);
+
+draggable.render();
+
+var frameNum = 0;
+var pressing = false;
+var holding = false;
+var mx = 0;
+var my = 0;
+var offX = 0;
+var offY = 0;
+
+function parseClick(e){
+	pressing = true;
+	if(draggable.checkClick(mx, my)){
+		holding = draggable; 
+		offX = e.offsetX - draggable.x;
+		offY = e.offsetY - draggable.y;
+	} //check collision and fill with object later
+}
+
+function parseMove(e){
+	mx = e.offsetX;
+	my = e.offsetY;
+	
+	mouseX = mx;
+	mouseY = my;
+	//if holding, move according to mousePos
+	
+	if(holding){
+		holding.x = mx - offX;
+		holding.y = my - offY;
+	}
+}
+
+function parseRelease(e){
+	//var mx = e.offsetX;
+	//var my = e.offsetY;
+	pressing = false;
+	holding = false;
+}
+
+function refresh(){	
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+	draggable.render();
+	//fill this with render commands
+	fillAndStrokeText("Frames: " + frameNum, 500, 250);
+    frameNum++;
+	requestAnimationFrame(refresh);	
+}
+
+document.addEventListener("mousedown", parseClick);
+document.addEventListener("mousemove", parseMove);
+document.addEventListener("mouseup", parseRelease);
+requestAnimationFrame(refresh);
+</script>
