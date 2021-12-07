@@ -125,9 +125,20 @@ class Button {
 		}
 	} 
 }
+
+/*
+Split MenuElement into different primitives? currently does not super.
+order of render operations:
+
+
+image data
+color
+border
+*/
+
 //move paths with ctx.transform and apply transform.
-class Element {
-	constructor(data, /*x, y, w, h*/ color, border = false, text = false){
+class MenuElement {
+	constructor(data, /*x, y, w, h*/ color = rgba(0,0,0,0), border = false, text = false){
 		//data consists of a shape type and data. 
 		this.data = data;
 		this.type = data[0];
