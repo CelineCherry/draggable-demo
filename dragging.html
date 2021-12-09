@@ -5,6 +5,8 @@ canvas {
 }
 </style>
 
+<img src="hukidashi1.png" id="idontwannalose" hidden>
+
 <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -16,6 +18,8 @@ crate (image)
 frame count (backless image)
 face (path with cutout)
 */
+
+var idontwannalose = document.getElementById("idontwannalose");
 
 var canvas = document.getElementById("gameCanvas");
 canvas.height = 500;
@@ -126,8 +130,14 @@ class Button {
 	} 
 }
 
+class Shape {
+	constructor(type, x, y, w, h, data){
+
+	}
+}
 /*
-Split MenuElement into different primitives? currently does not super.
+create shape class
+shelve path2D type for later
 order of render operations:
 
 translate (and rotate?)
@@ -135,10 +145,9 @@ image data
 color
 border
 
-add rotation
+add rotation and opacity
 */
 
-//move paths with ctx.transform and apply transform.
 class MenuElement {
 	constructor(data, /*x, y, w, h*/ color, border = false, text = false){
 		//data consists of a shape type and data. 
@@ -161,13 +170,13 @@ class MenuElement {
 			this.y = data[3];
 			this.w = data[4];
 			this.h = data[5];
-		} //x, y, width, height
-		else if (data[0] == "path"){} //pathdata(?), x, y
+		} // x, y, width, height
+		else if (data[0] == "path"){
+			this.path = data[1]
+			this.x = data[2];
+			this.y = data[3];
+		} //pathdata(?), x, y
 
-		//this.x = x;
-		//this.y = y;
-		//this.w = w;
-		//this.h = h;
 		if(color){this.color = color;}
 		if(border){
 			this.borderWidth = border[0];
@@ -209,7 +218,23 @@ class MenuElement {
 		if(this.type == "image"){
 			ctx.drawImage(this.imageData, this.x, this.y, this.w, this.h);
 		} //drawImage
-		if(this.type == "path"){} //transform and reset
+		if(this.type == "path"){
+			if (this.color){
+				ctx.fillStyle = this.color; 
+				ctx.save(); 
+				ctx.translate(this.x, this.y);
+				ctx.fill(this.path);
+				ctx.restore();
+			}
+			if (this.borderWidth){
+				ctx.lineWidth = this.borderWidth; 
+				ctx.fillStyle = this.borderColor;
+				ctx.save(); 
+				ctx.translate(this.x, this.y);
+				ctx.stroke(this.path);
+				ctx.restore();
+			}
+		} //transform and reset
 	}
 	checkClick(mx, my){
 		//type based collison checking, for paths use subtract and point in path.
@@ -228,14 +253,19 @@ class MenuElement {
 			else {	
 				return false;
 			}
-		} //pythagorean
-		if(this.type == "path"){} //point in path
+		}
+		if(this.type == "path"){
+			ctx.translate(this.x, this.y);
+			var hit = ctx.isPointInPath(this.path,mx,my);
+			ctx.translate(-this.x, -this.y);
+			return hit;
+		}
 	} 
 }
 
 //var draggable = new Button(0,0,100,25, "brown", 7, "drag me", "white", "10px sans-serif");
 
-var draggable = new MenuElement(["rectangle", 0,0,100,25], "brown", [7, "black"], ["drag me", "white", "10px sans-serif"]);
+var draggable = new MenuElement(["path", new Path2D('M10 10 h 80 v 80 h -80 Z'), 100,100,500,200], "brown", [7, "green"], ["drag me", "white", "10px sans-serif"]);
 
 draggable.render();
 
