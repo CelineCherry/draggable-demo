@@ -1,3 +1,5 @@
+<!DOCTYPE html>
+
 <title>Dragging Demo</title>
 <style>
 canvas {
@@ -131,60 +133,102 @@ class Button {
 }
 
 class Shape {
-	constructor(type, x, y, w, h, data){
+	constructor(type, color, borderWidth, borderColor, data, x, y, ...dimensions){
+		this.type = type;
+		if(color){this.color = color;}
+		if(borderWidth){this.borderWidth = borderWidth;}
+		if(borderColor){this.borderColor = borderColor;}
+		this.x = x;
+		this.y = y;
 
+		if(type == "rectangle" || type == "image"){
+			this.w = dimensions[0];
+			this.h = dimensions[1];
+			if(type == "image"){this.imageData = data;}
+		}
+		else if (type == "circle"){
+			this.r = dimensions[0];
+		}
+		else if (type == "path"){this.path = data;}
+	}
+	render(offsetX, offsetY){
+		if(this.type == "rectangle"){
+			drawBox(this.x + offsetX, this.y + offsetY, this.w, this.h, this.color, this.borderWidth, this.borderColor);
+		}
+		else if(this.type == "circle"){
+			ctx.beginPath();
+			ctx.arc(this.x + offsetX, this.y + offsetY, this.r, 0, 2*Math.PI);
+			if (this.color){ctx.fillStyle = this.color; ctx.fill();}
+			if (this.borderWidth){
+				ctx.lineWidth = this.borderWidth;
+				ctx.fillStyle = this.borderColor;
+				ctx.stroke();
+			}
+		}
+		else if(this.type == "image"){
+			ctx.drawImage(this.imageData, this.x + offsetX, this.y + offsetY, this.w, this.h);
+		}
+		else if(this.type == "path"){
+			if (this.color){
+				ctx.fillStyle = this.color; 
+				ctx.save(); 
+				ctx.translate(this.x + offsetX, this.y + offsetY);
+				ctx.fill(this.path);
+				ctx.restore();
+			}
+			if (this.borderWidth){
+				ctx.lineWidth = this.borderWidth; 
+				ctx.fillStyle = this.borderColor;
+				ctx.save();
+				ctx.translate(this.x + offsetX, this.y + offsetY);
+				ctx.stroke(this.path);
+				ctx.restore();
+			}
+		}
+	}
+	checkClick(mx, my, offsetX, offsetY){
+		var x = offsetX ? this.x + offsetX : this.x;
+		var y = offsetY ? this.y + offsetY : this.y;
+		//type based collison checking, for paths use subtract and point in path.
+		if(this.type == "rectangle" || this.type == "image"){
+			if(x < mx && mx < x + this.w && y < my && my < y + this.h){
+				return true;
+			}
+			else {
+				return false;
+			}
+		}
+		if(this.type == "circle"){
+			if(Math.sqrt( Math.pow((x - mx), 2) + Math.pow((y - my), 2)) < this.r){
+				return true;
+			}
+			else {	
+				return false;
+			}
+			
+		}
+		if(this.type == "path"){
+			ctx.translate(x, y);
+			var hit = ctx.isPointInPath(this.path,mx,my);
+			ctx.translate(-x, -y);
+			return hit;
+		}
 	}
 }
 /*
-create shape class
-shelve path2D type for later
-order of render operations:
-
-translate (and rotate?)
-image data
-color
-border
-
 add rotation and opacity
 */
 
 class MenuElement {
-	constructor(data, /*x, y, w, h*/ color, border = false, text = false){
-		//data consists of a shape type and data. 
-		this.data = data;
-		this.type = data[0];
-		if(data[0] == "rectangle"){
-			this.x = data[1];
-			this.y = data[2];
-			this.w = data[3];
-			this.h = data[4];
-		}
-		else if (data[0] == "circle"){
-			this.x = data[1];
-			this.y = data[2];
-			this.r = data[3];
-		} //x, y, radius
-		else if (data[0] == "image"){
-			this.imageData = data[1];
-			this.x = data[2];
-			this.y = data[3];
-			this.w = data[4];
-			this.h = data[5];
-		} // x, y, width, height
-		else if (data[0] == "path"){
-			this.path = data[1]
-			this.x = data[2];
-			this.y = data[3];
-		} //pathdata(?), x, y
-
-		if(color){this.color = color;}
-		if(border){
-			this.borderWidth = border[0];
-			this.borderColor = border[1];
-		}
+	constructor(x, y, shapes, text = false, collider = false){
+		this.x = x;
+		this.y = y;
+		//data consists of a shape type and data.
+		this.shapes = shapes;
+		if (collider) {this.collider = collider;}
 		else {
-			this.borderWidth = false;
-			this.borderColor = 0;
+			if(Array.isArray(shapes)){this.collider = shapes[0];}
+			else {this.collider = shapes;}
 		}
 
 		if(text){
@@ -194,80 +238,42 @@ class MenuElement {
 		}
 		else {
 			this.text = false;
-			this.textColor = 0;
-			this.font = 0;
 		}
 	}
-	render(){ 
-		//check type and execute specific render. paths render with transform and reset transform
-		// text comes after specific render, rotate before.
-		if(this.type == "rectangle"){
-			if(this.text){drawBox(this.x, this.y, this.w, this.h, this.color, this.borderWidth, this.borderColor, this.text, this.textColor, this.font);}
-			else {drawBox(this.x, this.y, this.w, this.h, this.color, this.borderWidth, this.borderColor);}
-		}
-		if(this.type == "circle"){
-			ctx.beginPath();
-			ctx.arc(this.x, this.y, this.r, 0, 2*Math.PI);
-			if (this.color){ctx.fillStyle = this.color; ctx.fill();}
-			if (this.borderWidth){
-				ctx.lineWidth = this.borderWidth; 
-				ctx.fillStyle = this.borderColor; 
-				ctx.stroke();
+	render(){
+		//change this to have shapes and shape initialized under diiferent conditions.
+		if(Array.isArray(this.shapes)){
+			var shape = 0;
+			for (shape of this.shapes){
+				shape.render(this.x, this.y);
 			}
 		}
-		if(this.type == "image"){
-			ctx.drawImage(this.imageData, this.x, this.y, this.w, this.h);
-		} //drawImage
-		if(this.type == "path"){
-			if (this.color){
-				ctx.fillStyle = this.color; 
-				ctx.save(); 
-				ctx.translate(this.x, this.y);
-				ctx.fill(this.path);
-				ctx.restore();
-			}
-			if (this.borderWidth){
-				ctx.lineWidth = this.borderWidth; 
-				ctx.fillStyle = this.borderColor;
-				ctx.save(); 
-				ctx.translate(this.x, this.y);
-				ctx.stroke(this.path);
-				ctx.restore();
-			}
-		} //transform and reset
+		else {
+			this.shapes.render(this.x, this.y);
+		}
+	
+		if(this.text){
+			ctx.font = this.font;
+			ctx.fillStyle = this.textColor;
+			ctx.textAlign = "center";
+			ctx.textBaseline = "middle";
+			ctx.fillText(this.text, this.x + this.collider.x + this.collider.w/2, this.y + this.collider.y + this.collider.w/2);		
+			ctx.textAlign = "left";
+		}
 	}
 	checkClick(mx, my){
-		//type based collison checking, for paths use subtract and point in path.
-		if(this.type == "rectangle" || this.type == "image"){
-			if(this.x < mx && mx < this.x + this.w && this.y < my && my < this.y + this.h){
-				return true;
-			}
-			else {
-				return false;
-			}
-		}
-		if(this.type == "circle"){
-			if(Math.sqrt( Math.pow((this.x-mx), 2) + Math.pow((this.y-my), 2)) < this.r){
-				return true;
-			}
-			else {	
-				return false;
-			}
-		}
-		if(this.type == "path"){
-			ctx.translate(this.x, this.y);
-			var hit = ctx.isPointInPath(this.path,mx,my);
-			ctx.translate(-this.x, -this.y);
-			return hit;
-		}
+		return this.collider.checkClick(mx, my, this.x, this.y);
 	} 
 }
 
 //var draggable = new Button(0,0,100,25, "brown", 7, "drag me", "white", "10px sans-serif");
 
-var draggable = new MenuElement(["path", new Path2D('M10 10 h 80 v 80 h -80 Z'), 100,100,500,200], "brown", [7, "green"], ["drag me", "white", "10px sans-serif"]);
+var testShape = new Shape("rectangle","green",7,"black", false, 30,30,30,30);
+var testShape2 = new Shape("circle","blue",4,"black", false, 30,30,20);
 
-draggable.render();
+var draggable = new MenuElement(0, 0, [testShape, testShape2], ["drag me", "grey", "20px sans-serif"]);
+
+//draggable.render();
 
 var frameNum = 0;
 var pressing = false;
@@ -310,6 +316,7 @@ function parseRelease(e){
 function refresh(){	
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 	draggable.render();
+	testShape.render();
 	//fill this with render commands
 	fillAndStrokeText("Frames: " + frameNum, 500, 250);
     frameNum++;
