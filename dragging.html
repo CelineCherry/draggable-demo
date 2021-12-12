@@ -19,6 +19,11 @@ circle
 crate (image)
 frame count (backless image)
 face (path with cutout)
+
+add text as a type of shape? needs x, y, text (str or array), borderWidth, borderColor, color, width
+make it so you can define collider to be a list of shapes or alternitavely an index inside shapes.
+make primitive shapes drawn into a temporary path, render text and image straight (for text break), draw rect if image special case
+add rotation and opacity
 */
 
 var idontwannalose = document.getElementById("idontwannalose");
@@ -46,25 +51,6 @@ function ease(variable, upwards, increment, lowerBound, upperBound){
 function fillAndStrokeText(text, x, y){
 	ctx.strokeText(text, x, y);
 	ctx.fillText(text, x, y);
-}
-
-function drawBox(x, y, w, h, color, borderWidth = false, borderColor = "black", text = false, textColor = "white", font = "bold 10px sans-serif"){
-	var fontSize = parseInt(ctx.font.match(/\d+/), 10);
-	if(borderWidth){
-		ctx.strokeStyle = borderColor;
-		ctx.lineWidth = borderWidth;
-		ctx.strokeRect(x,y, w,h);
-	}
-	ctx.fillStyle = color;
-	ctx.fillRect(x,y, w,h);
-	if(text){
-		ctx.font = font;
-		ctx.fillStyle = textColor;
-		ctx.textAlign = "center";
-		ctx.textBaseline = "middle";		
-		ctx.fillText(text, x + w/2, y + h/2 + 1);		
-		ctx.textAlign = "left";
-	}		
 }
 
 function breakTextIntoLines(string, width){
@@ -104,34 +90,6 @@ function drawTextLines(x, y, lines, drawType = "fill"){
 	}
 }
 
-class Button {
-	constructor(x, y, w, h, color, border = false, text = false, textColor, font){
-		this.x = x;
-		this.y = y;
-		this.w = w;
-		this.h = h;
-		this.color = color;
-		if(border){this.border = border;}
-		if(text){
-			this.text = text;
-			this.textColor = textColor;
-			this.font = font;
-		}
-	}
-	render(){
-		if(this.text){drawBox(this.x, this.y, this.w, this.h, this.color, this.border, "black", this.text, this.textColor, this.font);}
-		else {drawBox(this.x, this.y, this.w, this.h, this.color, this.border, "black");}
-	}
-	checkClick(mx, my){
-		if(this.x < mx && mx < this.x + this.w && this.y < my && my < this.y + this.h){
-			return true;
-		}
-		else {
-			return false;
-		}
-	} 
-}
-
 class Shape {
 	constructor(type, color, borderWidth, borderColor, data, x, y, ...dimensions){
 		this.type = type;
@@ -152,12 +110,21 @@ class Shape {
 		else if (type == "path"){this.path = data;}
 	}
 	render(offsetX, offsetY){
+		var x = offsetX ? this.x + offsetX : this.x;
+		var y = offsetY ? this.y + offsetY : this.y;
+
 		if(this.type == "rectangle"){
-			drawBox(this.x + offsetX, this.y + offsetY, this.w, this.h, this.color, this.borderWidth, this.borderColor);
+			if(this.borderWidth){
+				ctx.strokeStyle = this.borderColor;
+				ctx.lineWidth = this.borderWidth;
+				ctx.strokeRect(x,y, this.w,this.h);
+			}
+			ctx.fillStyle = this.color;
+			ctx.fillRect(x,y, this.w,this.h);
 		}
 		else if(this.type == "circle"){
 			ctx.beginPath();
-			ctx.arc(this.x + offsetX, this.y + offsetY, this.r, 0, 2*Math.PI);
+			ctx.arc(x, y, this.r, 0, 2*Math.PI);
 			if (this.color){ctx.fillStyle = this.color; ctx.fill();}
 			if (this.borderWidth){
 				ctx.lineWidth = this.borderWidth;
@@ -166,13 +133,13 @@ class Shape {
 			}
 		}
 		else if(this.type == "image"){
-			ctx.drawImage(this.imageData, this.x + offsetX, this.y + offsetY, this.w, this.h);
+			ctx.drawImage(this.imageData, x, y, this.w, this.h);
 		}
 		else if(this.type == "path"){
 			if (this.color){
 				ctx.fillStyle = this.color; 
 				ctx.save(); 
-				ctx.translate(this.x + offsetX, this.y + offsetY);
+				ctx.translate(x, y);
 				ctx.fill(this.path);
 				ctx.restore();
 			}
@@ -180,7 +147,7 @@ class Shape {
 				ctx.lineWidth = this.borderWidth; 
 				ctx.fillStyle = this.borderColor;
 				ctx.save();
-				ctx.translate(this.x + offsetX, this.y + offsetY);
+				ctx.translate(x, y);
 				ctx.stroke(this.path);
 				ctx.restore();
 			}
@@ -215,9 +182,6 @@ class Shape {
 		}
 	}
 }
-/*
-add rotation and opacity
-*/
 
 class MenuElement {
 	constructor(x, y, shapes, text = false, collider = false){
@@ -241,7 +205,6 @@ class MenuElement {
 		}
 	}
 	render(){
-		//change this to have shapes and shape initialized under diiferent conditions.
 		if(Array.isArray(this.shapes)){
 			var shape = 0;
 			for (shape of this.shapes){
@@ -266,14 +229,12 @@ class MenuElement {
 	} 
 }
 
-//var draggable = new Button(0,0,100,25, "brown", 7, "drag me", "white", "10px sans-serif");
+var examplePath = new Path2D("M10,90 Q90,90 90,45 Q90,10 50,10 Q10,10 10,40 Q10,70 45,70 Q70,70 75,50");
 
-var testShape = new Shape("rectangle","green",7,"black", false, 30,30,30,30);
-var testShape2 = new Shape("circle","blue",4,"black", false, 30,30,20);
+var testShape = new Shape("image","green",7,"black", idontwannalose, 30,30,30,30);
+var testShape2 = new Shape("path","blue",4,"black", examplePath, 30,30,20);
 
 var draggable = new MenuElement(0, 0, [testShape, testShape2], ["drag me", "grey", "20px sans-serif"]);
-
-//draggable.render();
 
 var frameNum = 0;
 var pressing = false;
@@ -316,9 +277,8 @@ function parseRelease(e){
 function refresh(){	
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 	draggable.render();
-	testShape.render();
 	//fill this with render commands
-	fillAndStrokeText("Frames: " + frameNum, 500, 250);
+	draggable.text = "Frames: " + frameNum;
     frameNum++;
 	requestAnimationFrame(refresh);	
 }
