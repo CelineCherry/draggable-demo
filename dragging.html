@@ -20,10 +20,10 @@ crate (image)
 frame count (backless image)
 face (path with cutout)
 
-add text as a type of shape? needs x, y, text (str or array), borderWidth, borderColor, color, width
-make it so you can define collider to be a list of shapes or alternitavely an index inside shapes.
-make primitive shapes drawn into a temporary path, render text and image straight (for text break), draw rect if image special case
-add rotation and opacity
+# add text as a type of shape? needs x, y, text (str or array), borderWidth, borderColor, color, width
+straighten out text and collider init code.
+add rotation and opacity, rotation addative
+fix border and text slicing
 */
 
 var idontwannalose = document.getElementById("idontwannalose");
@@ -108,6 +108,24 @@ class Shape {
 			this.r = dimensions[0];
 		}
 		else if (type == "path"){this.path = data;}
+		else if (type == "text"){
+			this.font = dimensions[0];
+			if(dimensions[1]){
+				this.w = dimensions[1];
+				ctx.font = this.font;
+				this.text = breakTextIntoLines(data, this.w);
+				ctx.textBaseline = "top";
+				this.h = ctx.measureText(this.text[0]).actualBoundingBoxDescent*this.text.length*1.25;
+			}
+			else {
+				this.text = data;
+				ctx.font = this.font;
+				ctx.textBaseline = "top";
+				this.w = ctx.measureText(this.text).width;
+				this.h = ctx.measureText(this.text).actualBoundingBoxDescent;
+				
+			}
+		}
 	}
 	render(offsetX, offsetY){
 		var x = offsetX ? this.x + offsetX : this.x;
@@ -152,6 +170,37 @@ class Shape {
 				ctx.restore();
 			}
 		}
+		else if (this.type == "text"){
+			ctx.font = this.font;
+			if(Array.isArray(this.text)){
+				var fontHeight = parseInt(ctx.font.match(/\d+/), 10);
+				var i = 0;
+				if(this.borderWidth){
+					ctx.lineWidth = this.borderWidth;
+					ctx.fillStyle = this.borderColor;
+					for(i = 0; i < this.text.length; i++){					
+						ctx.strokeText(this.text[i], x, y + i * 1.25 * fontHeight);
+					}
+				}
+				if(this.color){
+					ctx.fillStyle = this.color;
+					for(i = 0; i < this.text.length; i++){					
+						ctx.fillText(this.text[i], x, y + i * 1.25 * fontHeight);
+					}
+				}
+			}
+			else {
+				if(this.borderWidth){
+					ctx.lineWidth = this.borderWidth;
+					ctx.fillStyle = this.borderColor;	
+					ctx.strokeText(this.text, x, y);
+				}
+				if(this.color){			
+					ctx.fillStyle = this.color;	
+					ctx.fillText(this.text, x, y);
+				}
+			}
+		}
 	}
 	checkClick(mx, my, offsetX, offsetY){
 		var x = offsetX ? this.x + offsetX : this.x;
@@ -183,25 +232,15 @@ class Shape {
 	}
 }
 
-class MenuElement {
-	constructor(x, y, shapes, text = false, collider = false){
+class VisualElement {
+	constructor(x, y, shapes, collider = false){
 		this.x = x;
 		this.y = y;
-		//data consists of a shape type and data.
 		this.shapes = shapes;
-		if (collider) {this.collider = collider;}
+		if (collider) {this.collider = collider;} // add special case for when collider is an index of shapes.
 		else {
 			if(Array.isArray(shapes)){this.collider = shapes[0];}
 			else {this.collider = shapes;}
-		}
-
-		if(text){
-			this.text = text[0];
-			this.textColor = text[1];
-			this.font = text[2];
-		}
-		else {
-			this.text = false;
 		}
 	}
 	render(){
@@ -214,15 +253,6 @@ class MenuElement {
 		else {
 			this.shapes.render(this.x, this.y);
 		}
-	
-		if(this.text){
-			ctx.font = this.font;
-			ctx.fillStyle = this.textColor;
-			ctx.textAlign = "center";
-			ctx.textBaseline = "middle";
-			ctx.fillText(this.text, this.x + this.collider.x + this.collider.w/2, this.y + this.collider.y + this.collider.w/2);		
-			ctx.textAlign = "left";
-		}
 	}
 	checkClick(mx, my){
 		return this.collider.checkClick(mx, my, this.x, this.y);
@@ -231,10 +261,11 @@ class MenuElement {
 
 var examplePath = new Path2D("M10,90 Q90,90 90,45 Q90,10 50,10 Q10,10 10,40 Q10,70 45,70 Q70,70 75,50");
 
-var testShape = new Shape("image","green",7,"black", idontwannalose, 30,30,30,30);
-var testShape2 = new Shape("path","blue",4,"black", examplePath, 30,30,20);
+var testShape = new Shape("image","green",7,"black", idontwannalose, 0,0,200,100);
+var testShape2 = new Shape("text","pink",3,"black", "Wow, another liberal complaning about the health of care...", -100, 100, "30px serif");
+var testShape3 = new Shape("text","blue",3,"black", "Joe many liberals does it take to change a log by bulb??? Their Gender", -100, 100 + testShape2.h, "30px serif", 400, "End-aligned", "middle");
 
-var draggable = new MenuElement(0, 0, [testShape, testShape2], ["drag me", "grey", "20px sans-serif"]);
+var draggable = new VisualElement(200, 200, [testShape, testShape2, testShape3]);
 
 var frameNum = 0;
 var pressing = false;
@@ -277,8 +308,7 @@ function parseRelease(e){
 function refresh(){	
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 	draggable.render();
-	//fill this with render commands
-	draggable.text = "Frames: " + frameNum;
+	testShape2.text = "Frames: " + frameNum;
     frameNum++;
 	requestAnimationFrame(refresh);	
 }
