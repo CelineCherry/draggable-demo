@@ -6,10 +6,12 @@ canvas {
 	border: 5px solid black;
 }
 </style>
-
 <img src="hukidashi1.png" id="idontwannalose" hidden>
 
 <canvas id="gameCanvas"></canvas>
+
+pretty pretty path buffer:
+<svg id="pathBuffer"></svg>
 
 <script>
 /*
@@ -22,8 +24,11 @@ face (path with cutout)
 
 # add text as a type of shape? needs x, y, text (str or array), borderWidth, borderColor, color, width
 straighten out text and collider init code.
+make collider special cases: index, "all", span
 add rotation and opacity, rotation addative
-fix border and text slicing
+# fix border and text slicing
+
+find center of path by creating a hidden temp html path element with styling and getting the bounding box. 
 */
 
 var idontwannalose = document.getElementById("idontwannalose");
@@ -33,7 +38,11 @@ canvas.height = 500;
 canvas.width = 750;
 var ctx = canvas.getContext("2d");
 
+var pathBuffer = document.getElementById("pathBuffer");
+
 ctx.miterLimit = 2;
+
+const degrees = Math.PI/180;
 
 function ease(variable, upwards, increment, lowerBound, upperBound){
 	var number = variable;
@@ -91,11 +100,13 @@ function drawTextLines(x, y, lines, drawType = "fill"){
 }
 
 class Shape {
-	constructor(type, color, borderWidth, borderColor, data, x, y, ...dimensions){
+	constructor(type, color, borderWidth, borderColor, opacity, rotation, data, x, y, ...dimensions){
 		this.type = type;
 		if(color){this.color = color;}
 		if(borderWidth){this.borderWidth = borderWidth;}
 		if(borderColor){this.borderColor = borderColor;}
+		if(opacity && opacity != 1){this.opacity = opacity;}
+		if(rotation && rotation != 0 || rotation != 360){this.r = rotation[0]; this.rAxis = rotation[1];}
 		this.x = x;
 		this.y = y;
 
@@ -107,15 +118,28 @@ class Shape {
 		else if (type == "circle"){
 			this.r = dimensions[0];
 		}
-		else if (type == "path"){this.path = data;}
+		else if (type == "path"){
+			this.path = new Path2D(data);
+			var newElement = document.createElementNS("http://www.w3.org/2000/svg", 'path'); //Create a path in SVG's namespace
+			newElement.id = "temp";
+			newElement.setAttribute("d",data); //Set path's data
+			if (this.borderWidth){newElement.style.strokeWidth = this.borderWidth + "px";} //Set stroke width
+			pathBuffer.appendChild(newElement);
+			var dimensions = document.getElementById("temp").getBoundingClientRect();
+			this.w = dimensions.width;
+			this.h = dimensions.height;
+			newElement.remove();
+		}
 		else if (type == "text"){
 			this.font = dimensions[0];
+			if(dimensions[2]){this.align = dimensions[2]}
+			if(dimensions[3]){this.baseline = dimensions[3]}
 			if(dimensions[1]){
-				this.w = dimensions[1];
 				ctx.font = this.font;
-				this.text = breakTextIntoLines(data, this.w);
+				this.text = breakTextIntoLines(data, dimensions[1]);
 				ctx.textBaseline = "top";
 				this.h = ctx.measureText(this.text[0]).actualBoundingBoxDescent*this.text.length*1.25;
+				this.w = ctx.measureText(this.text[0]).width;
 			}
 			else {
 				this.text = data;
@@ -127,9 +151,19 @@ class Shape {
 			}
 		}
 	}
-	render(offsetX, offsetY){
+	render(offsetX, offsetY, offsetAlpha, offsetRX, offsetRY){
 		var x = offsetX ? this.x + offsetX : this.x;
 		var y = offsetY ? this.y + offsetY : this.y;
+		var alpha = offsetAlpha ? this.opacity + offsetAlpha : this.opacity;
+		if(alpha){ctx.globalAlpha = alpha;}
+		if(this.r){
+			ctx.save();
+			ctx.translate(offsetRX + this.x + this.w/2, offsetRY + this.y + this.h/2);
+			ctx.rotate(this.r * degrees);
+			x = this.w/-2;
+			y = this.h/-2;
+			//ctx.translate(-this.rAxis[0], -this.rAxis[1]);
+		}
 
 		if(this.type == "rectangle"){
 			if(this.borderWidth){
@@ -146,12 +180,21 @@ class Shape {
 			if (this.color){ctx.fillStyle = this.color; ctx.fill();}
 			if (this.borderWidth){
 				ctx.lineWidth = this.borderWidth;
-				ctx.fillStyle = this.borderColor;
+				ctx.strokeStyle = this.borderColor;
 				ctx.stroke();
 			}
 		}
 		else if(this.type == "image"){
+			if(this.borderWidth){
+				ctx.strokeStyle = this.borderColor;
+				ctx.lineWidth = this.borderWidth;
+				ctx.strokeRect(x,y, this.w,this.h);
+			}
 			ctx.drawImage(this.imageData, x, y, this.w, this.h);
+			if (this.color){
+				ctx.fillStyle = this.color;
+				ctx.fillRect(x,y, this.w,this.h);
+			}
 		}
 		else if(this.type == "path"){
 			if (this.color){
@@ -163,7 +206,7 @@ class Shape {
 			}
 			if (this.borderWidth){
 				ctx.lineWidth = this.borderWidth; 
-				ctx.fillStyle = this.borderColor;
+				ctx.strokeStyle = this.borderColor;
 				ctx.save();
 				ctx.translate(x, y);
 				ctx.stroke(this.path);
@@ -171,13 +214,15 @@ class Shape {
 			}
 		}
 		else if (this.type == "text"){
-			ctx.font = this.font;
+			ctx.font = this.font;			
+			if(this.align){ctx.textAlign = this.align;}
+			if(this.baseline){ctx.textBaseline = this.baseline;}
 			if(Array.isArray(this.text)){
 				var fontHeight = parseInt(ctx.font.match(/\d+/), 10);
 				var i = 0;
 				if(this.borderWidth){
 					ctx.lineWidth = this.borderWidth;
-					ctx.fillStyle = this.borderColor;
+					ctx.strokeStyle = this.borderColor;
 					for(i = 0; i < this.text.length; i++){					
 						ctx.strokeText(this.text[i], x, y + i * 1.25 * fontHeight);
 					}
@@ -192,7 +237,7 @@ class Shape {
 			else {
 				if(this.borderWidth){
 					ctx.lineWidth = this.borderWidth;
-					ctx.fillStyle = this.borderColor;	
+					ctx.strokeStyle = this.borderColor;	
 					ctx.strokeText(this.text, x, y);
 				}
 				if(this.color){			
@@ -200,13 +245,18 @@ class Shape {
 					ctx.fillText(this.text, x, y);
 				}
 			}
+			ctx.textAlign = "left";
+			ctx.textBaseline = "top";
+			
 		}
+		if(alpha){ctx.globalAlpha = 1;}
+		if(this.r){ctx.restore();}
 	}
 	checkClick(mx, my, offsetX, offsetY){
 		var x = offsetX ? this.x + offsetX : this.x;
 		var y = offsetY ? this.y + offsetY : this.y;
 		//type based collison checking, for paths use subtract and point in path.
-		if(this.type == "rectangle" || this.type == "image"){
+		if(this.type == "rectangle" || this.type == "image" || this.type == "text"){
 			if(x < mx && mx < x + this.w && y < my && my < y + this.h){
 				return true;
 			}
@@ -247,11 +297,11 @@ class VisualElement {
 		if(Array.isArray(this.shapes)){
 			var shape = 0;
 			for (shape of this.shapes){
-				shape.render(this.x, this.y);
+				shape.render(this.x, this.y, false, this.x, this.y); //this.x, this.y
 			}
 		}
 		else {
-			this.shapes.render(this.x, this.y);
+			this.shapes.render(this.x, this.y, false, this.x, this.y);
 		}
 	}
 	checkClick(mx, my){
@@ -259,12 +309,12 @@ class VisualElement {
 	} 
 }
 
-var examplePath = new Path2D("M10,90 Q90,90 90,45 Q90,10 50,10 Q10,10 10,40 Q10,70 45,70 Q70,70 75,50");
+var examplePath = "M 253.475 97.472 C 253.475 116.824 238.087 132.584 218.88 133.181 C 204.838 170.411 168.88 196.892 126.737 196.892 C 84.594 196.892 48.636 170.411 34.594 133.181 C 15.387 132.583 -0 116.824 0 97.472 C -0 77.864 15.798 61.944 35.359 61.747 C 49.909 25.553 85.339 0 126.737 -0 C 168.135 -0 203.565 25.553 218.115 61.747 C 237.677 61.944 253.475 77.863 253.475 97.472 Z";
 
-var testShape = new Shape("image","green",7,"black", idontwannalose, 0,0,200,100);
-var testShape2 = new Shape("text","pink",3,"black", "Wow, another liberal complaning about the health of care...", -100, 100, "30px serif");
-var testShape3 = new Shape("text","blue",3,"black", "Joe many liberals does it take to change a log by bulb??? Their Gender", -100, 100 + testShape2.h, "30px serif", 400, "End-aligned", "middle");
-
+var testShape = new Shape("path","rgba(0,0,255, 0.2)",3,"black", 1, 0, examplePath, 0,0);
+var testShape2 = new Shape("text","blue",3,"black",  0.8, false, "Move yo fat head", 300, 100, "30px serif", 400, "right");
+var testShape3 = new Shape("text","blue",3,"black",  0.8, [45], "Move yo fat head", 300, 100, "30px serif", 400, "right");
+//new Shape("text","pink",3,"black",  0.5, false, "Wow, another liberal complaning about the health of care...", testShape.x + testShape.w/2, 100, "30px serif", 400);
 var draggable = new VisualElement(200, 200, [testShape, testShape2, testShape3]);
 
 var frameNum = 0;
@@ -308,7 +358,8 @@ function parseRelease(e){
 function refresh(){	
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 	draggable.render();
-	testShape2.text = "Frames: " + frameNum;
+	testShape3.rotation++;
+	//testShape3.text = "Frames: " + frameNum;
     frameNum++;
 	requestAnimationFrame(refresh);	
 }
