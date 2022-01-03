@@ -7,6 +7,10 @@ canvas {
 }
 </style>
 <img src="hukidashi1.png" id="idontwannalose" hidden>
+<img src="windmill.png" id="windmill" hidden>
+<img src="windmillblades.png" id="windmillblades" hidden>
+
+
 
 <canvas id="gameCanvas"></canvas>
 
@@ -32,6 +36,8 @@ find center of path by creating a hidden temp html path element with styling and
 */
 
 var idontwannalose = document.getElementById("idontwannalose");
+var windmill = document.getElementById("windmill");
+var windmillblades = document.getElementById("windmillblades");
 
 var canvas = document.getElementById("gameCanvas");
 canvas.height = 500;
@@ -99,6 +105,24 @@ function drawTextLines(x, y, lines, drawType = "fill"){
 	}
 }
 
+class Sprite {
+	constructor(image, sX, sY, sWidth, sHeight){
+		this.image = image;
+		this.sX = sX;
+		this.sY = sY;
+		this.sWidth = sWidth;
+		this.sHeight = sHeight;
+	}
+	render(dx, dy, dWidth, dHeight){
+		ctx.drawImage(this.image, this.sX, this.sY, this.sWidth, this.sHeight, dx, dy, dWidth, dHeight);
+	}
+}
+
+var spriteLib = [
+	new Sprite(idontwannalose, 32, 0, 32, 32),
+];
+
+
 class Shape {
 	constructor(type, color, borderWidth, borderColor, opacity, rotation, data, x, y, ...dimensions){
 		this.type = type;
@@ -106,14 +130,21 @@ class Shape {
 		if(borderWidth){this.borderWidth = borderWidth;}
 		if(borderColor){this.borderColor = borderColor;}
 		if(opacity && opacity != 1){this.opacity = opacity;}
-		if(rotation && rotation != 0 || rotation != 360){this.r = rotation[0]; this.rAxis = rotation[1];}
+		if(rotation && rotation != 0 || rotation != 360){
+			if(typeof rotation == "object"){this.r = rotation[0]; this.rAxis = rotation[1]}
+			else{
+				this.r = rotation;
+			}
+		}
 		this.x = x;
 		this.y = y;
 
 		if(type == "rectangle" || type == "image"){
 			this.w = dimensions[0];
 			this.h = dimensions[1];
-			if(type == "image"){this.imageData = data;}
+			if(type == "image"){
+				this.imageData = data;
+			}
 		}
 		else if (type == "circle"){
 			this.r = dimensions[0];
@@ -151,17 +182,23 @@ class Shape {
 			}
 		}
 	}
-	render(offsetX, offsetY, offsetAlpha, offsetRX, offsetRY){
+	render(offsetX, offsetY, offsetAlpha){
 		var x = offsetX ? this.x + offsetX : this.x;
 		var y = offsetY ? this.y + offsetY : this.y;
-		var alpha = offsetAlpha ? this.opacity + offsetAlpha : this.opacity;
-		if(alpha){ctx.globalAlpha = alpha;}
+		if(this.alpha){
+			var alpha = offsetAlpha ? this.opacity + offsetAlpha : this.opacity; 
+			ctx.globalAlpha = alpha;
+		}
 		if(this.r){
+			if(!this.rAxis){this.rAxis = [this.w/2, this.h/2];}
 			ctx.save();
-			ctx.translate(offsetRX + this.x + this.w/2, offsetRY + this.y + this.h/2);
+			ctx.translate(x + this.rAxis[0], y + this.rAxis[1]);
 			ctx.rotate(this.r * degrees);
-			x = this.w/-2;
-			y = this.h/-2;
+				
+			x = -this.rAxis[0];
+			y = -this.rAxis[1];
+			//x = this.w/-2;
+			//y = this.h/-2;
 			//ctx.translate(-this.rAxis[0], -this.rAxis[1]);
 		}
 
@@ -190,7 +227,8 @@ class Shape {
 				ctx.lineWidth = this.borderWidth;
 				ctx.strokeRect(x,y, this.w,this.h);
 			}
-			ctx.drawImage(this.imageData, x, y, this.w, this.h);
+			if (this.imageData instanceof Sprite){this.imageData.render(x, y, this.w, this.h)}
+			else {ctx.drawImage(this.imageData, x, y, this.w, this.h);}
 			if (this.color){
 				ctx.fillStyle = this.color;
 				ctx.fillRect(x,y, this.w,this.h);
@@ -247,7 +285,6 @@ class Shape {
 			}
 			ctx.textAlign = "left";
 			ctx.textBaseline = "top";
-			
 		}
 		if(alpha){ctx.globalAlpha = 1;}
 		if(this.r){ctx.restore();}
@@ -297,7 +334,7 @@ class VisualElement {
 		if(Array.isArray(this.shapes)){
 			var shape = 0;
 			for (shape of this.shapes){
-				shape.render(this.x, this.y, false, this.x, this.y); //this.x, this.y
+				shape.render(this.x, this.y, false, this.x, this.y, this.x, this.y); //this.x, this.y
 			}
 		}
 		else {
@@ -311,11 +348,23 @@ class VisualElement {
 
 var examplePath = "M 253.475 97.472 C 253.475 116.824 238.087 132.584 218.88 133.181 C 204.838 170.411 168.88 196.892 126.737 196.892 C 84.594 196.892 48.636 170.411 34.594 133.181 C 15.387 132.583 -0 116.824 0 97.472 C -0 77.864 15.798 61.944 35.359 61.747 C 49.909 25.553 85.339 0 126.737 -0 C 168.135 -0 203.565 25.553 218.115 61.747 C 237.677 61.944 253.475 77.863 253.475 97.472 Z";
 
-var testShape = new Shape("path","rgba(0,0,255, 0.2)",3,"black", 1, 0, examplePath, 0,0);
-var testShape2 = new Shape("text","blue",3,"black",  0.8, false, "Move yo fat head", 300, 100, "30px serif", 400, "right");
-var testShape3 = new Shape("text","blue",3,"black",  0.8, [45], "Move yo fat head", 300, 100, "30px serif", 400, "right");
+/*bEas
+wind mill center at 128, 128
+
+blade handle 16px wide, center 64 px down
+blade axis at 8,64
+blade proper 300x143.988
+*/
+var testShape = new Shape("image",false,false,false, 1, false, windmill, 0,0, 660/4,1214/4);
+//new Shape("path","green",3,"black", 1, false, examplePath, 0,0);
+var testShape2 = new Shape("image",false,false,false, 1, [0,[8,41.5]], windmillblades, 75,25, 946/4, 374/4);
+var testShape3 = new Shape("image",false,false,false, 1, [90,[8,41.5]], windmillblades, 75,25, 946/4, 374/4);
+var testShape4 = new Shape("image",false,false,false, 1, [180,[8,41.5]], windmillblades, 75,25, 946/4, 374/4);
+var testShape5 = new Shape("image",false,false,false, 1, [270,[8,41.5]], windmillblades, 75,25, 946/4, 374/4);
+
+//new Shape("path",false,false,"black", 1, false, examplePath, 0, 0)
 //new Shape("text","pink",3,"black",  0.5, false, "Wow, another liberal complaning about the health of care...", testShape.x + testShape.w/2, 100, "30px serif", 400);
-var draggable = new VisualElement(200, 200, [testShape, testShape2, testShape3]);
+var draggable = new VisualElement(0, 0, [testShape, testShape2, testShape3, testShape4, testShape5]);
 
 var frameNum = 0;
 var pressing = false;
@@ -358,7 +407,10 @@ function parseRelease(e){
 function refresh(){	
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 	draggable.render();
-	testShape3.rotation++;
+	testShape2.r++;
+	testShape3.r++;
+	testShape4.r++;
+	testShape5.r++;
 	//testShape3.text = "Frames: " + frameNum;
     frameNum++;
 	requestAnimationFrame(refresh);	
