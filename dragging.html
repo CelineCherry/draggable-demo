@@ -19,20 +19,17 @@ pretty pretty path buffer:
 
 <script>
 /*
-example elements:
-square
-circle
-crate (image)
-frame count (backless image)
-face (path with cutout)
+implement colision between visual elements with colliders. Colliders should be saved as collections of paths, with the exception of circles.
+They should be toggleable to rotate with the rest of the element by transforming the points that make it up. Shape-shape collisions should be handled with the SAT.
+point-shape is handled with isPointInPath using a canvas copy of the unrotated path.
+colliders should be optional
 
 # add text as a type of shape? needs x, y, text (str or array), borderWidth, borderColor, color, width
 straighten out text and collider init code.
 make collider special cases: index, "all", span
-add rotation and opacity, rotation addative
+# add rotation and opacity, rotation addative
 # fix border and text slicing
-
-find center of path by creating a hidden temp html path element with styling and getting the bounding box. 
+# find center of path by creating a hidden temp html path element with styling and getting the bounding box.
 */
 
 var idontwannalose = document.getElementById("idontwannalose");
@@ -348,22 +345,31 @@ class VisualElement {
 
 var examplePath = "M 253.475 97.472 C 253.475 116.824 238.087 132.584 218.88 133.181 C 204.838 170.411 168.88 196.892 126.737 196.892 C 84.594 196.892 48.636 170.411 34.594 133.181 C 15.387 132.583 -0 116.824 0 97.472 C -0 77.864 15.798 61.944 35.359 61.747 C 49.909 25.553 85.339 0 126.737 -0 C 168.135 -0 203.565 25.553 218.115 61.747 C 237.677 61.944 253.475 77.863 253.475 97.472 Z";
 
-/*bEas
-wind mill center at 128, 128
-
-blade handle 16px wide, center 64 px down
-blade axis at 8,64
-blade proper 300x143.988
-*/
-var testShape = new Shape("image",false,false,false, 1, false, windmill, 0,0, 660/4,1214/4);
 //new Shape("path","green",3,"black", 1, false, examplePath, 0,0);
+//new Shape("path",false,false,"black", 1, false, examplePath, 0, 0)
+//new Shape("text","pink",3,"black",  0.5, false, "Wow, another liberal complaning about the health of care...", testShape.x + testShape.w/2, 100, "30px serif", 400);
+
+var testShape = new Shape("path","green",3,"black", 1, false, examplePath, 0,0);
+
 var testShape2 = new Shape("image",false,false,false, 1, [0,[8,41.5]], windmillblades, 75,25, 946/4, 374/4);
 var testShape3 = new Shape("image",false,false,false, 1, [90,[8,41.5]], windmillblades, 75,25, 946/4, 374/4);
 var testShape4 = new Shape("image",false,false,false, 1, [180,[8,41.5]], windmillblades, 75,25, 946/4, 374/4);
 var testShape5 = new Shape("image",false,false,false, 1, [270,[8,41.5]], windmillblades, 75,25, 946/4, 374/4);
 
-//new Shape("path",false,false,"black", 1, false, examplePath, 0, 0)
-//new Shape("text","pink",3,"black",  0.5, false, "Wow, another liberal complaning about the health of care...", testShape.x + testShape.w/2, 100, "30px serif", 400);
+/*
+wind mill center at 128, 128
+
+blade handle 16px wide, center 64 px down
+blade axis at 8,64
+blade proper 300x143.988
+
+var testShape = new Shape("image",false,false,false, 1, false, windmill, 0,0, 660/4,1214/4);
+var testShape2 = new Shape("image",false,false,false, 1, [0,[8,41.5]], windmillblades, 75,25, 946/4, 374/4);
+var testShape3 = new Shape("image",false,false,false, 1, [90,[8,41.5]], windmillblades, 75,25, 946/4, 374/4);
+var testShape4 = new Shape("image",false,false,false, 1, [180,[8,41.5]], windmillblades, 75,25, 946/4, 374/4);
+var testShape5 = new Shape("image",false,false,false, 1, [270,[8,41.5]], windmillblades, 75,25, 946/4, 374/4);
+*/
+
 var draggable = new VisualElement(0, 0, [testShape, testShape2, testShape3, testShape4, testShape5]);
 
 var frameNum = 0;
